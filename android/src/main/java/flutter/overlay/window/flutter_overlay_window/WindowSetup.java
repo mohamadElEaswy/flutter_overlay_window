@@ -18,7 +18,7 @@ public abstract class WindowSetup {
     static String overlayTitle = "Overlay is activated";
     static String overlayContent = "Tap to edit settings or disable";
     static String positionGravity = "none";
-    static int notificationVisibility = NotificationCompat.VISIBILITY_PRIVATE;
+    static int notificationVisibility = NotificationCompat.VISIBILITY_PUBLIC;
     static boolean enableDrag = false;
 
 
