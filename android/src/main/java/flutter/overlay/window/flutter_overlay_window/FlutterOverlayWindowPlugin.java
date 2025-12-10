@@ -1,11 +1,13 @@
 package flutter.overlay.window.flutter_overlay_window;
 
 import android.app.Activity;
+import android.app.AppOpsManager;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Binder;
 import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
@@ -39,6 +41,7 @@ public class FlutterOverlayWindowPlugin implements
         PluginRegistry.ActivityResultListener {
 
     private MethodChannel channel;
+    private MethodChannel xiaomiChannel;
     private Context context;
     private Activity mActivity;
     private BasicMessageChannel<Object> messenger;
@@ -50,6 +53,25 @@ public class FlutterOverlayWindowPlugin implements
         this.context = flutterPluginBinding.getApplicationContext();
         channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), OverlayConstants.CHANNEL_TAG);
         channel.setMethodCallHandler(this);
+
+        xiaomiChannel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), OverlayConstants.XIAOMI_PERMISSIONS_TAG);
+        xiaomiChannel.setMethodCallHandler((call, result) -> {
+            switch (call.method) {
+                case "isXiaomiDevice":
+                    result.success(Build.MANUFACTURER != null && Build.MANUFACTURER.equalsIgnoreCase("Xiaomi"));
+                    break;
+                case "checkLockScreenPermission":
+                    result.success(isShowOnLockScreenPermissionEnabled());
+                    break;
+                case "openLockScreenSettings":
+                    openXiaomiPermissionSettings();
+                    result.success(null);
+                    break;
+                default:
+                    result.notImplemented();
+                    break;
+            }
+        });
 
         messenger = new BasicMessageChannel(flutterPluginBinding.getBinaryMessenger(), OverlayConstants.MESSENGER_TAG,
                 JSONMessageCodec.INSTANCE);
@@ -137,6 +159,9 @@ public class FlutterOverlayWindowPlugin implements
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
         channel.setMethodCallHandler(null);
+        if (xiaomiChannel != null) {
+            xiaomiChannel.setMethodCallHandler(null);
+        }
         WindowSetup.messenger.setMessageHandler(null);
     }
 
@@ -183,6 +208,46 @@ public class FlutterOverlayWindowPlugin implements
             return Settings.canDrawOverlays(context);
         }
         return true;
+    }
+
+    private boolean isShowOnLockScreenPermissionEnabled() {
+        try {
+            AppOpsManager manager = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
+            java.lang.reflect.Method method = AppOpsManager.class.getDeclaredMethod(
+                    "checkOpNoThrow",
+                    int.class,
+                    int.class,
+                    String.class
+            );
+            Object res = method.invoke(manager, 10020, Binder.getCallingUid(), context.getPackageName());
+            int mode = (res instanceof Integer) ? (Integer) res : AppOpsManager.MODE_ERRORED;
+            return AppOpsManager.MODE_ALLOWED == mode;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void openXiaomiPermissionSettings() {
+        try {
+            Intent intent = new Intent("miui.intent.action.APP_PERM_EDITOR");
+            intent.setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity");
+            intent.putExtra("extra_pkgname", context.getPackageName());
+            if (mActivity != null) {
+                mActivity.startActivity(intent);
+            } else {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            }
+        } catch (Exception e) {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.fromParts("package", context.getPackageName(), null));
+            if (mActivity != null) {
+                mActivity.startActivity(intent);
+            } else {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            }
+        }
     }
 
     @Override

@@ -13,6 +13,8 @@ class FlutterOverlayWindow {
       MethodChannel("x-slayer/overlay_channel");
   static const MethodChannel _overlayChannel =
       MethodChannel("x-slayer/overlay");
+  static const MethodChannel _xiaomiChannel =
+      MethodChannel("com.yourapp/xiaomi_permissions");
   static const BasicMessageChannel _overlayMessageChannel =
       BasicMessageChannel("x-slayer/overlay_messenger", JSONMessageCodec());
 
@@ -160,6 +162,30 @@ class FlutterOverlayWindow {
   static Future<bool> isActive() async {
     final bool? _res = await _channel.invokeMethod<bool?>('isOverlayActive');
     return _res ?? false;
+  }
+
+  static Future<bool> isXiaomiDevice() async {
+    try {
+      final bool? res =
+          await _xiaomiChannel.invokeMethod<bool>('isXiaomiDevice');
+      return res ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  static Future<bool> checkLockScreenPermission() async {
+    try {
+      final bool? res =
+          await _xiaomiChannel.invokeMethod<bool>('checkLockScreenPermission');
+      return res ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  static Future<void> openLockScreenSettings() async {
+    await _xiaomiChannel.invokeMethod<void>('openLockScreenSettings');
   }
 
   /// Dispose overlay stream
